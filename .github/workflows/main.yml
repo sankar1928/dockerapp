@@ -1,0 +1,61 @@
+name: Python CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-test-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Code Clone: GitHub automatically checks out the repo
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      # 2️⃣ Code Compile: For Python we usually just verify syntax
+      - name: Verify Python syntax (compile)
+        run: python -m compileall .
+
+      # 3️⃣ Code Review: Run a linter (e.g., flake8)
+      - name: Run code review (lint)
+        uses: py-actions/flake8@v2
+        with:
+          args: "--max-line-length=100"
+
+      # 4️⃣ Unit Testing: Run pytest with coverage
+      - name: Run unit tests
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+          pytest --cov=. --cov-report=xml
+
+      # 5️⃣ Code Build: Package the application (wheel)
+      - name: Build Python package
+        run: |
+          pip install build
+          python -m build
+
+      # 6️⃣ Docker the Build: Build & push Docker image
+      - name: Log in to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/my-python-app:latest
+
+      # 7️⃣ Code Deploy: Example deploy step (e.g., to Azure Web App)
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: "my-python-app"
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          images: ${{ secrets.DOCKER_USERNAME }}/my-python-app:latest
